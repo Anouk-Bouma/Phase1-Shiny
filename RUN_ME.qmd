@@ -23,7 +23,7 @@ code_keywords <- c("code", "script", "osf", "github", "supplement",
                    "replicate", "reproduce", "zenodo", "appendix")
 
 # Data file — update this path to match your batch file
-data_file <- "1-100_Lieke-Marcel.rds"
+data_file <- "test-data.rds"
 
 if (file.exists(data_file)) {
   articles <- readRDS(data_file)

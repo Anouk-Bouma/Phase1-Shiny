@@ -84,84 +84,17 @@ names(full_data)[names(full_data) == "Abstract"] <- "abstract"
 ```{r}
 # Continue with full data rds file here after adding the keywords
 # Keyword definitions
-key_phrases_exact <- c("our simulation",
-                 "our simulations",
-                 "our simulated",
-                 "we simulated",
-                 "we simulate",
-                 "this paper simulates",
-                 "the simulations in this paper",
-                 "simulation was conducted",
-                 "simulations were conducted",
-                 "data was generated",
-                 "data were generated",
-                 "we generated data",
-                 "I generated data",
-                 "monte carlo simulation was", 
-                 "our monte carlo simulation",
-                 "our Monte-Carlo simulation",
-                 "our numerical experiment",
-                 "we conducted a simulation",
-                 "simulation results",
-                 "simulation outcomes",
-                 "simulations were performed",
-                 "performed simulations",
-                 "simulation was performed",
-                 "simulation study was performed",
-                 "performed a simulation",
-                 "simulations were used",
-                 "through simulation, we",
-                 "we conducted a monte carlo simulation",
-                 "we conducted a simulation",
-                 "we conducted monte carlo simulations",
-                 "we conducted simulations",
-                 "simulation conditions for our",
-                 "we selected the simulation",
-                 "we selected simulation",
-                 "simulated conditions",
-                 "simulation conditions",
-                 "design of the simulation",
-                 "were simulated",
-                 "was simulated")
+key_phrases_exact <- c("code",
+                       " script",
+                       "osf",
+                       "github",
+                       "gitlab",
+                       "zenodo",
+                       "figshare")
 
 
 key_phrases_gapped <- list(
-  c("we", "simulated"),
-  c("our", "simulation"),
-  c("simulation", "we"),
-  c("simulated", "we"),
-  c("I", "simulated"),
-  c("my", "simulation"),
-  c("simulation", "I"),
-  c("simulated", "I"),
-  c("we", "simulate"),
-  c("we", "generated data"),
-  c("we generated", "data"),
-  c("we conducted", "simulations"),
-  c("we", "conducted simulations"),
-  c("our", "Monte Carlo"),
-  c("we", "Monte Carlo"),
-  c("Monte Carlo", "we"),
-  c("Monte Carlo", "our"),
-  c("simulation", "results"),
-  c("we", "simulation"),
-  c("this study", "simulate"),
-  c("this study", "simulation"),
-  c("simulate", "this study"),
-  c("simulation", "this study"),
-  c("simulation study", "our"),
-  c("simulation study", "we"),
-  c("simulation", "current study"),
-  c("simulations", "current study"),
-  c("current study", "simulation"),
-  c("current study", "simulations"),
-  c("simulations were", "run"),
-  c("simulations", "were run"),
-  c("simulations", "above"),
-  c("simulation", "above"),
-  c("conditions", "simulation"),
-  c("simulation", "conditions"),
-  c("I", "simulate")
+  c("code", "shared")
 )
 max_gap <- 3  # Fixed number of words allowed between gapped phrases
 ```
@@ -220,7 +153,7 @@ extract_keyword_context <- function(text, key_phrases_exact, key_phrases_gapped,
 
 
 # Apply function to each article
-full_data <- full_data %>%
+full_data <- test_data %>%
   mutate(keyword_data = map(full_text, ~extract_keyword_context(.x, key_phrases_exact, key_phrases_gapped, max_gap)))
 ```
 
@@ -239,7 +172,7 @@ all_articles <- readRDS("C:/Systematic Review/Systematic_Review_Automation/all_a
 # Getting a subset ready to send out for evaluation
 df <- all_articles[801:1200,] #fill out the rows that need to be included here!
 
-saveRDS(df, file = "801-1200_Anouk.rds") #after saving put this file in the right folder to send it out to evaluator
+saveRDS(full_data, file = "test-data.rds") #after saving put this file in the right folder to send it out to evaluator
 
 ```
 
