@@ -1,6 +1,5 @@
 ---
 title: "RUN_ME"
-author: "Anouk Bouma"
 format: html
 editor: visual
 ---
@@ -13,280 +12,336 @@ library(dplyr)
 library(stringr)
 library(purrr)
 
-abstract_phrases <- c("simulate", 
-                      "simulated", 
-                      "simulation", 
-                      "simulating", 
-                      "monte carlo",
-                      "monte-carlo",
-                      "simulations",
-                      "numerical experiment",
-                      "numerical experiments")
+# Keywords in protocol order (for display ordering and abstract highlighting)
+code_keywords <- c("code", "script", "osf", "github", "supplement",
+                   "replicate", "reproduce", "zenodo", "appendix")
 
-# Define path for loading and saving data
+# Data file — update this path to match your batch file
 data_file <- "1-100_Lieke-Marcel.rds"
 
-# Load data (replace with your actual data loading code)
 if (file.exists(data_file)) {
   input_data <- readRDS(data_file)
 } else {
-  stop("Data file not found. Please ensure 'inclusion_decisions.rds' exists.")
+  stop(paste("Data file not found:", data_file))
 }
 
-# -------------------------------
-# 1. UI with a fixed navigation panel (with two rows) and centered content
-# -------------------------------
+# Add screening columns if absent (allows loading old RDS files)
+new_cols <- c("code_available", "code_sufficiency", "code_location",
+              "no_code_reason", "programming_language",
+              "programming_language_other", "note")
+for (col in new_cols) {
+  if (!col %in% names(input_data)) input_data[[col]] <- NA_character_
+}
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+# Wrap bare URLs in the text with clickable <a> tags
+linkify <- function(text) {
+  if (is.na(text) || nchar(text) == 0) return(text)
+  str_replace_all(text,
+    "(https?://[^\\s<>\"'\\)\\]]+)",
+    '<a href="\\1" target="_blank">\\1</a>')
+}
+
+# Bold every code keyword and linkify URLs in an abstract string
+highlight_abstract <- function(text, keywords) {
+  if (is.na(text) || nchar(text) == 0) return(text)
+  for (kw in keywords) {
+    text <- str_replace_all(text,
+      regex(paste0("\\b", kw, "\\b"), ignore_case = TRUE),
+      paste0("<strong>", kw, "</strong>"))
+  }
+  linkify(text)
+}
+
+# Persist the currently-displayed article's inputs back into rv$data and save
+save_current <- function(rv, input) {
+  idx   <- rv$current_page
+  data  <- rv$data
+
+  ca <- input[[paste0("code_available_", idx)]]
+  if (!is.null(ca)) {
+    data$code_available[idx] <- if (ca == "not_assessed") NA_character_ else ca
+
+    if (ca == "yes") {
+      cs <- input[[paste0("code_sufficiency_", idx)]]
+      cl <- input[[paste0("code_location_",   idx)]]
+      if (!is.null(cs)) data$code_sufficiency[idx] <- cs
+      if (!is.null(cl)) data$code_location[idx]    <- cl
+      # Clear mutually exclusive fields
+      data$no_code_reason[idx]              <- NA_character_
+      data$programming_language[idx]        <- NA_character_
+      data$programming_language_other[idx]  <- NA_character_
+
+    } else if (ca == "no") {
+      nr <- input[[paste0("no_code_reason_",           idx)]]
+      pl <- input[[paste0("programming_language_",     idx)]]
+      po <- input[[paste0("programming_language_other_", idx)]]
+      if (!is.null(nr)) data$no_code_reason[idx]       <- nr
+      if (!is.null(pl)) data$programming_language[idx] <- pl
+      if (!is.null(pl) && pl == "Other" && !is.null(po))
+        data$programming_language_other[idx] <- po
+      else
+        data$programming_language_other[idx] <- NA_character_
+      # Clear mutually exclusive fields
+      data$code_sufficiency[idx] <- NA_character_
+      data$code_location[idx]    <- NA_character_
+
+    } else {
+      # not_assessed — clear everything
+      data$code_sufficiency[idx]            <- NA_character_
+      data$code_location[idx]               <- NA_character_
+      data$no_code_reason[idx]              <- NA_character_
+      data$programming_language[idx]        <- NA_character_
+      data$programming_language_other[idx]  <- NA_character_
+    }
+  }
+
+  nt <- input[[paste0("note_", idx)]]
+  if (!is.null(nt)) data$note[idx] <- nt
+
+  rv$data <- data
+  saveRDS(rv$data, data_file)
+}
+
+# ---------------------------------------------------------------------------
+# UI
+# ---------------------------------------------------------------------------
 ui <- fluidPage(
-  titlePanel("Systematic Review Article Screening"),
-  
+  titlePanel("Code Availability Screening"),
+
   fixedPanel(
     top = 0, left = 0, right = 0, height = "140px",
     style = "background-color: white; z-index: 1000; padding: 10px; border-bottom: 1px solid #ccc;",
-    
-    # First row: header
+
     fluidRow(
-      column(12, h4("Export Inclusion Decisions"))
+      column(12, h4("Code Availability Review"))
     ),
-    
-    # Second row: navigation controls
     fluidRow(
-      column(2, actionButton("prev_page", "Previous Page")),
-      column(2, actionButton("next_page", "Next Page")),
+      column(2, actionButton("prev_page",       "Previous")),
+      column(2, actionButton("next_page",       "Next")),
       column(2, actionButton("next_unscreened", "Next Unscreened")),
-      column(2, actionButton("save_inputs", "Save")),
-      column(2, numericInput("jump_page", "Jump to page:", 
-                               value = 1, min = 1, step = 1, width = "80px")),
+      column(2, actionButton("save_inputs",     "Save")),
+      column(2, numericInput("jump_page", "Jump to:", value = 1, min = 1, step = 1, width = "80px")),
       column(2, actionButton("go_page", "Go"))
     ),
-    
-    # Third row: current page info
     fluidRow(
       column(12, textOutput("page_info"))
     )
   ),
-  
-  # Main content with top margin so it doesn't get hidden under the fixed panel.
+
   tags$div(
-    style = "margin-top: 150px; margin-left: auto; margin-right: auto; padding-left: 20px; padding-right: 20px; max-width: 900px; font-size: 1.2em;",
-    uiOutput("article_reports")
+    style = paste(
+      "margin-top: 150px;",
+      "margin-left: auto; margin-right: auto;",
+      "padding-left: 20px; padding-right: 20px;",
+      "max-width: 900px; font-size: 1.2em;"
+    ),
+    uiOutput("article_display")
   )
 )
 
-# -------------------------------
-# 2. Server with “start where I left off” functionality, manual saving, and page jump
-# -------------------------------
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
 server <- function(input, output, session) {
-  articles_per_page <- 1
-  
-  # Create reactive values to store the data and the current page.
-  inclusion_decisions <- reactiveValues(
-    data = input_data,
-    current_page = 1  # default; will update below
-  )
-  
-  # Set the starting page to the page that has the first incomplete article.
-  # An incomplete article is defined as one where none of the checkboxes
-  # (included, excluded, second_reviewer) are checked and no note is entered.
-  {
-    incomplete <- which(
-      (!input_data$included) &
-      (!input_data$excluded) &
-      (!input_data$second_reviewer) #&
-      #(is.na(input_data$note) | input_data$note == "")
-    )
-    if (length(incomplete) > 0) {
-      first_incomplete <- min(incomplete)
-      inclusion_decisions$current_page <- ceiling(first_incomplete / articles_per_page)
-    } else {
-      inclusion_decisions$current_page <- 1
-    }
-  }
-  
-  # Compute total number of pages
-  total_pages <- reactive({
-    n_articles <- nrow(inclusion_decisions$data)
-    ceiling(n_articles / articles_per_page)
-  })
-  
-  # Observers to update the current page when the navigation buttons are clicked.
-  observeEvent(input$next_page, {
-    if (inclusion_decisions$current_page < total_pages()) {
-      inclusion_decisions$current_page <- inclusion_decisions$current_page + 1
-    }
-  })
-  
-  observeEvent(input$next_unscreened, {
-  articles <- inclusion_decisions$data
 
-  # Loop through articles starting from the current page + 1
-  start_index <- inclusion_decisions$current_page * articles_per_page + 1
-  next_unscreened <- which(
-    (!articles$included) &
-    (!articles$excluded) &
-    (!articles$second_reviewer) #&
-    #(is.na(articles$note) | articles$note == "")
+  rv <- reactiveValues(
+    data         = input_data,
+    current_page = 1
   )
-  
-  # Find the first incomplete article after the current one
-  next_index <- next_unscreened[next_unscreened >= start_index][1]
-  
-  if (!is.na(next_index)) {
-    inclusion_decisions$current_page <- ceiling(next_index / articles_per_page)
-  } else {
-    showNotification("No more unscreened articles found.", type = "message")
+
+  # Start on the first article where code_available has not been set
+  {
+    unscreened <- which(is.na(input_data$code_available))
+    rv$current_page <- if (length(unscreened) > 0) min(unscreened) else 1
   }
-})
-  
-  
+
+  total_pages <- reactive(nrow(rv$data))
+
+  # -- Navigation (each saves before moving) ----------------------------------
+
   observeEvent(input$prev_page, {
-    if (inclusion_decisions$current_page > 1) {
-      inclusion_decisions$current_page <- inclusion_decisions$current_page - 1
+    save_current(rv, input)
+    if (rv$current_page > 1) rv$current_page <- rv$current_page - 1
+  })
+
+  observeEvent(input$next_page, {
+    save_current(rv, input)
+    if (rv$current_page < total_pages()) rv$current_page <- rv$current_page + 1
+  })
+
+  observeEvent(input$next_unscreened, {
+    save_current(rv, input)
+    start      <- rv$current_page + 1
+    unscreened <- which(is.na(rv$data$code_available))
+    next_idx   <- unscreened[unscreened >= start][1]
+    if (!is.na(next_idx)) {
+      rv$current_page <- next_idx
+    } else {
+      showNotification("No more unscreened articles.", type = "message")
     }
   })
-  
-  # Observer for the "Go" button to jump to a specified page.
+
   observeEvent(input$go_page, {
     req(input$jump_page)
-    new_page <- as.integer(input$jump_page)
-    if (new_page >= 1 && new_page <= total_pages()) {
-      inclusion_decisions$current_page <- new_page
+    save_current(rv, input)
+    p <- as.integer(input$jump_page)
+    if (p >= 1 && p <= total_pages()) {
+      rv$current_page <- p
     } else {
-      showNotification("Invalid page number", type = "error")
+      showNotification("Invalid page number.", type = "error")
     }
   })
-  
-  # Update the numeric input so it reflects the current page.
-  observe({
-    updateNumericInput(session, "jump_page", 
-                         value = inclusion_decisions$current_page,
-                         min = 1, max = total_pages())
-  })
-  
-  # Display current page information.
-  output$page_info <- renderText({
-    paste("Page", inclusion_decisions$current_page, "of", total_pages())
-  })
-  
-  # Render the articles for the current page.
-  output$article_reports <- renderUI({
-    articles <- inclusion_decisions$data
-    current_page <- inclusion_decisions$current_page
-    
-    # Compute the start and end indices for the current page.
-    start_index <- (current_page - 1) * articles_per_page + 1
-    end_index <- min(nrow(articles), start_index + articles_per_page - 1)
-    current_articles <- articles[start_index:end_index, ]
-    
-    # Build UI for each article in the current subset.
-    lapply(seq_len(nrow(current_articles)), function(i) {
-      global_index <- start_index + i - 1
-      article <- current_articles[i, ]
-      keyword_df <- article$keyword_data[[1]]
-      
-      # Bold abstract keywords by replacing the abstract phrases.
-      bold_abstract <- article$abstract
-      for (kw in abstract_phrases) {
-        pattern <- paste0("\\b", kw, "\\b")
-        bold_abstract <- str_replace_all(bold_abstract,
-                                         regex(pattern, ignore_case = TRUE),
-                                         paste0("<strong>", kw, "</strong>"))
-      }
-      
-      tagList(
-        h3(article$title),
-        p(
-          strong("DOI Link: "),
-          tags$a(
-            href = article$`DOI Link`,
-            target = "_blank",
-            article$`DOI Link`
-          )
-        ),
-        p(strong("DOI:"), article$DOI),
-        h4("Abstract"),
-        p(HTML(bold_abstract)),  # Render HTML for bold formatting
-        
-        # Display keyword matches if available, or a message otherwise.
-        if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
-          tagList(
-            h4("Keyword Matches"),
-            lapply(unique(keyword_df$keyword), function(kw) {
-              contexts <- keyword_df$context[keyword_df$keyword == kw]
-              tagList(
-                h4(kw),
-                tags$ul(
-                  lapply(contexts, function(context) {
-                    tags$li(HTML(str_replace_all(context,
-                                                  fixed(kw),
-                                                  paste0("<strong>", kw, "</strong>"))))
-                  })
-                )
-              )
-            })
-          )
-        } else {
-          h4(HTML("<span style='font-size: 18px; font-weight: bold; font-style: italic;'> No Keywords found for this article. </span>"))
-        },
-        
-        # Checkboxes for decisions (using a global index for input IDs)
-        checkboxInput(paste0("include_", global_index), "Include in review", article$included),
-        checkboxInput(paste0("exclude_", global_index), "Exclude from review", article$excluded),
-        checkboxInput(paste0("second_reviewer_", global_index), "Second reviewer", article$second_reviewer),
-        
-        # Text area for notes
-        textAreaInput(
-          inputId = paste0("note_", global_index),
-          label = "Notes:",
-          value = article$note,
-          width = "100%",
-          rows = 10
-        ),
-        
-        hr()
-      )
-    })
-  })
-  
-  # Observer to update and save decisions/notes when the user navigates pages.
-  observeEvent(c(input$next_page, input$prev_page), {
-    articles <- inclusion_decisions$data
-    # Loop through all articles to update if an input exists.
-    for (i in seq_len(nrow(articles))) {
-      if (!is.null(input[[paste0("include_", i)]]))
-        articles$included[i] <- input[[paste0("include_", i)]]
-      if (!is.null(input[[paste0("exclude_", i)]]))
-        articles$excluded[i] <- input[[paste0("exclude_", i)]]
-      if (!is.null(input[[paste0("second_reviewer_", i)]]))
-        articles$second_reviewer[i] <- input[[paste0("second_reviewer_", i)]]
-      if (!is.null(input[[paste0("note_", i)]]))
-        articles$note[i] <- input[[paste0("note_", i)]]
-    }
-    inclusion_decisions$data <- articles
-    saveRDS(inclusion_decisions$data, data_file)
-  })
-  
-  # Observer for the Save button.
+
+  # Manual save
   observeEvent(input$save_inputs, {
-    articles <- inclusion_decisions$data
-    # Loop through all articles to update if an input exists.
-    for (i in seq_len(nrow(articles))) {
-      if (!is.null(input[[paste0("include_", i)]]))
-        articles$included[i] <- input[[paste0("include_", i)]]
-      if (!is.null(input[[paste0("exclude_", i)]]))
-        articles$excluded[i] <- input[[paste0("exclude_", i)]]
-      if (!is.null(input[[paste0("second_reviewer_", i)]]))
-        articles$second_reviewer[i] <- input[[paste0("second_reviewer_", i)]]
-      if (!is.null(input[[paste0("note_", i)]]))
-        articles$note[i] <- input[[paste0("note_", i)]]
-    }
-    inclusion_decisions$data <- articles
-    saveRDS(inclusion_decisions$data, data_file)
-    showNotification("Inputs saved!", type = "message")
+    save_current(rv, input)
+    showNotification("Saved!", type = "message")
+  })
+
+  # Keep the jump-to input in sync with the current page
+  observe({
+    updateNumericInput(session, "jump_page",
+                       value = rv$current_page, min = 1, max = total_pages())
+  })
+
+  output$page_info <- renderText({
+    screened <- sum(!is.na(rv$data$code_available))
+    paste0("Article ", rv$current_page, " of ", total_pages(),
+           "  |  Screened: ", screened, " / ", total_pages())
+  })
+
+  # -- Article display --------------------------------------------------------
+  output$article_display <- renderUI({
+    idx     <- rv$current_page
+    article <- rv$data[idx, ]
+
+    keyword_df <- article$keyword_data[[1]]
+
+    bold_abstract <- highlight_abstract(article$abstract, code_keywords)
+
+    # Current saved values (with safe defaults for UI initialisation)
+    ca  <- ifelse(is.na(article$code_available),           "not_assessed",   article$code_available)
+    cs  <- ifelse(is.na(article$code_sufficiency),         "sufficient",     article$code_sufficiency)
+    cl  <- ifelse(is.na(article$code_location),            "",               article$code_location)
+    nr  <- ifelse(is.na(article$no_code_reason),           "no_mention",     article$no_code_reason)
+    pl  <- ifelse(is.na(article$programming_language),     "",               article$programming_language)
+    plo <- ifelse(is.na(article$programming_language_other), "",             article$programming_language_other)
+    nt  <- ifelse(is.na(article$note),                     "",               article$note)
+
+    tagList(
+
+      # -- Article metadata ---------------------------------------------------
+      h3(article$title),
+      p(strong("DOI Link: "),
+        tags$a(href = article$`DOI Link`, target = "_blank", article$`DOI Link`)),
+      p(strong("DOI: "), article$DOI),
+
+      h4("Abstract"),
+      p(HTML(bold_abstract)),
+
+      # -- Keyword matches (in protocol order) --------------------------------
+      if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
+        tagList(
+          h4("Keyword Matches"),
+          tagList(lapply(code_keywords, function(kw) {
+            contexts <- keyword_df$context[keyword_df$keyword == kw]
+            if (length(contexts) == 0) return(NULL)
+            tagList(
+              h5(strong(kw)),
+              tags$ul(lapply(contexts, function(ctx) {
+                ctx_hl <- str_replace_all(
+                  ctx,
+                  regex(paste0("\\b", kw, "\\b"), ignore_case = TRUE),
+                  paste0("<strong>", kw, "</strong>"))
+                ctx_hl <- linkify(ctx_hl)
+                tags$li(HTML(ctx_hl))
+              }))
+            )
+          }))
+        )
+      } else {
+        p(em("No keyword matches found for this article."))
+      },
+
+      hr(),
+      h4("Code Availability Assessment"),
+
+      # -- Step 1: Is code available? -----------------------------------------
+      radioButtons(
+        inputId  = paste0("code_available_", idx),
+        label    = "Is any code available?",
+        choices  = c("Not yet assessed" = "not_assessed",
+                     "Yes"              = "yes",
+                     "No"               = "no"),
+        selected = ca
+      ),
+
+      # -- If YES: sufficiency + location -------------------------------------
+      conditionalPanel(
+        condition = sprintf("input['code_available_%d'] === 'yes'", idx),
+        radioButtons(
+          inputId  = paste0("code_sufficiency_", idx),
+          label    = "Code sufficiency:",
+          choices  = c(
+            "The code that is available could be sufficient to reproduce the simulation."                   = "sufficient",
+            "Some code is available, but it is clearly insufficient to reproduce the simulation(s) in the article." = "insufficient"
+          ),
+          selected = cs
+        ),
+        textInput(
+          inputId = paste0("code_location_", idx),
+          label   = "Code location (paste URL or describe):",
+          value   = cl,
+          width   = "100%"
+        )
+      ),
+
+      # -- If NO: reason + programming language -------------------------------
+      conditionalPanel(
+        condition = sprintf("input['code_available_%d'] === 'no'", idx),
+        radioButtons(
+          inputId  = paste0("no_code_reason_", idx),
+          label    = "Why is no code available?",
+          choices  = c(
+            "Authors mention code sharing but the code is not retrievable (e.g., broken link, private repository)" = "not_retrievable",
+            "No mention of code sharing in the article"                                                             = "no_mention"
+          ),
+          selected = nr
+        ),
+        selectInput(
+          inputId  = paste0("programming_language_", idx),
+          label    = "Programming language used in the simulation study:",
+          choices  = c("Select..." = "", "R", "Python", "MATLAB", "Stata", "SAS", "C/C++", "Julia", "Other"),
+          selected = pl
+        ),
+        conditionalPanel(
+          condition = sprintf("input['programming_language_%d'] === 'Other'", idx),
+          textInput(
+            inputId = paste0("programming_language_other_", idx),
+            label   = "Specify programming language:",
+            value   = plo,
+            width   = "100%"
+          )
+        )
+      ),
+
+      # -- Notes (always visible) ---------------------------------------------
+      textAreaInput(
+        inputId = paste0("note_", idx),
+        label   = "Notes:",
+        value   = nt,
+        width   = "100%",
+        rows    = 5
+      ),
+
+      hr()
+    )
   })
 }
 
 shinyApp(ui = ui, server = server)
-
-
-
 ```
