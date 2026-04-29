@@ -31,19 +31,29 @@ if (file.exists(data_file)) {
   stop(paste("Data file not found:", data_file))
 }
 
+# Remove invisible Unicode characters that PDF extraction inserts into URLs
+# (zero-width space, zero-width non-joiner/joiner, soft hyphen, BOM)
+clean_url <- function(url) {
+  str_remove_all(url, "[​‌‍­﻿]")
+}
+
 # Extract all unique URLs from a character vector of text snippets
 extract_urls <- function(texts) {
   texts <- texts[!is.na(texts)]
   matches <- str_extract_all(texts, "https?://[^\\s<>\"'\\)\\]]+")
-  unique(unlist(matches))
+  urls <- unique(unlist(matches))
+  unique(sapply(urls, clean_url, USE.NAMES = FALSE))
 }
 
-# Wrap URLs in text with clickable <a> tags
+# Wrap URLs in text with clickable <a> tags (cleans href, keeps display text clean too)
 linkify <- function(text) {
   if (is.na(text) || nchar(text) == 0) return(text)
   str_replace_all(text,
     "(https?://[^\\s<>\"'\\)\\]]+)",
-    '<a href="\\1" target="_blank">\\1</a>')
+    function(url) {
+      clean <- clean_url(url)
+      sprintf('<a href="%s" target="_blank">%s</a>', clean, clean)
+    })
 }
 
 # Bold code keywords and linkify URLs in a block of text
