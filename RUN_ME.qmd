@@ -73,10 +73,16 @@ for (i in seq_len(nrow(articles))) {
   article     <- articles[i, ]
   keyword_df  <- article$keyword_data[[1]]
 
-  # Collect all text sources for URL extraction
   context_texts <- if (!is.null(keyword_df) && nrow(keyword_df) > 0)
     keyword_df$context else character(0)
-  all_urls <- extract_urls(c(article$abstract, context_texts))
+
+  # Use pre-extracted URLs from XML pipeline if available (cleaner, includes
+  # hyperlinks from the PDF's link layer). Fall back to regex for PDF-sourced data.
+  all_urls <- if ("urls" %in% names(article) && length(article$urls[[1]]) > 0) {
+    article$urls[[1]]
+  } else {
+    extract_urls(c(article$abstract, context_texts))
+  }
 
   bold_abstract <- highlight_text(article$abstract, code_keywords)
 
