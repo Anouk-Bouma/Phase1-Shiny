@@ -23,7 +23,7 @@ code_keywords <- c("code", "script", "osf", "github", "supplement",
                    "replicate", "reproduce", "zenodo", "appendix")
 
 # Data file — update this path to match your batch file
-data_file <- "test-data.rds"
+data_file <- "pilot-data.rds"
 
 if (file.exists(data_file)) {
   articles <- readRDS(data_file)
@@ -61,8 +61,8 @@ highlight_text <- function(text, keywords) {
   if (is.na(text) || nchar(text) == 0) return(text)
   for (kw in keywords) {
     text <- str_replace_all(text,
-      regex(paste0("\\b", kw, "\\b"), ignore_case = TRUE),
-      paste0("<strong>", kw, "</strong>"))
+      regex(paste0("\\b", kw, "\\w*"), ignore_case = TRUE),
+      function(m) paste0("<strong>", m, "</strong>"))
   }
   linkify(text)
 }
@@ -107,8 +107,8 @@ for (i in seq_len(nrow(articles))) {
       cat(sprintf("*%s*\n\n", kw))
       for (ctx in contexts) {
         ctx_hl <- str_replace_all(ctx,
-          regex(paste0("\\b", kw, "\\b"), ignore_case = TRUE),
-          paste0("<strong>", kw, "</strong>"))
+          regex(paste0("\\b", kw, "\\w*"), ignore_case = TRUE),
+          function(m) paste0("<strong>", m, "</strong>"))
         ctx_hl <- linkify(ctx_hl)
         cat(sprintf('<blockquote>%s</blockquote>\n\n', ctx_hl))
       }

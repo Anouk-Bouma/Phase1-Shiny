@@ -188,28 +188,15 @@ extract_keyword_context <- function(text, key_phrases_exact, key_phrases_gapped,
   if (is.na(text) || nchar(trimws(text)) == 0)
     return(tibble(keyword = character(0), context = character(0)))
 
-  exact_pattern   <- paste0("\\b(", paste(key_phrases_exact, collapse = "|"), ")\\b")
-  gapped_patterns <- sapply(key_phrases_gapped, function(pair) {
-    paste0("\\b", pair[1], "\\b(?:\\s+[\\w,\\.\\!\\?]+){0,", max_gap,
-           "}\\s+\\b", pair[2], "\\b")
-  })
-
-  combined_pattern <- regex(
-    paste(c(exact_pattern, gapped_patterns), collapse = "|"),
-    ignore_case = TRUE
-  )
-
-  matches <- unlist(str_extract_all(text, combined_pattern))
-  if (length(matches) == 0)
-    return(tibble(keyword = character(0), context = character(0)))
-
   sentences <- unlist(strsplit(text, "(?<=[.!?])\\s+", perl = TRUE))
 
-  map_dfr(matches, function(match) {
-    idx <- which(str_detect(sentences, regex(match, ignore_case = TRUE)))
+  # Returns one row per unique sentence that matches pattern, labelled with kw_label
+  contexts_for <- function(kw_label, pattern) {
+    idx <- unique(which(str_detect(sentences, pattern)))
+    if (length(idx) == 0) return(tibble(keyword = character(0), context = character(0)))
     map_dfr(idx, function(i) {
       tibble(
-        keyword = match,
+        keyword = kw_label,
         context = paste(na.omit(c(
           if (i > 1) sentences[i - 1] else NA_character_,
           sentences[i],
@@ -217,7 +204,23 @@ extract_keyword_context <- function(text, key_phrases_exact, key_phrases_gapped,
         )), collapse = " ")
       )
     })
+  }
+
+  # Prefix match (\bkeyword) catches all case variants and suffixes:
+  # e.g. "supplement" also matches Supplement, supplementary, supplemental
+  exact_results <- map_dfr(key_phrases_exact, function(kw) {
+    contexts_for(kw, regex(paste0("\\b", kw), ignore_case = TRUE))
   })
+
+  gapped_results <- map_dfr(key_phrases_gapped, function(pair) {
+    pattern <- regex(
+      paste0("\\b", pair[1], "(?:\\s+[\\w,\\.\\!\\?]+){0,", max_gap, "}\\s+\\b", pair[2]),
+      ignore_case = TRUE
+    )
+    contexts_for(paste(pair, collapse = " "), pattern)
+  })
+
+  bind_rows(exact_results, gapped_results)
 }
 
 full_data <- full_data %>%
