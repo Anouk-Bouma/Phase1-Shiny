@@ -37,7 +37,7 @@ bib_raw <- bib2df(bib_file)
 
 meta_data <- bib_raw %>%
   transmute(
-    title    = TITLE,
+    title    = str_remove_all(TITLE, "[{}]"),
     abstract = ABSTRACT,
     DOI      = DOI
   ) %>%
