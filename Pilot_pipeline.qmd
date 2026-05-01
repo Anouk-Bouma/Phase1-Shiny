@@ -85,10 +85,10 @@ parse_tei_xml <- function(xml_path) {
     urls_structured <- urls_structured[!is.na(urls_structured) & nzchar(urls_structured)]
     urls_structured <- sapply(urls_structured, clean_url, USE.NAMES = FALSE)
 
-    urls_text <- sapply(
-      unique(unlist(str_extract_all(
-        paste(abstract, full_text), "https?://[^\\s<>\"'\\)\\]]+"))),
-      clean_url, USE.NAMES = FALSE)
+    urls_text <- unlist(str_extract_all(
+      paste(abstract, full_text), "https?://[^\\s<>\"'\\)\\]]+"))
+    urls_text <- str_remove(urls_text, "[.,;:!?]+$")
+    urls_text <- sapply(urls_text, clean_url, USE.NAMES = FALSE)
 
     all_urls <- unique(c(urls_structured, urls_text))
     all_urls <- all_urls[nzchar(all_urls)]

@@ -41,8 +41,10 @@ clean_url <- function(url) {
 extract_urls <- function(texts) {
   texts <- texts[!is.na(texts)]
   matches <- str_extract_all(texts, "https?://[^\\s<>\"'\\)\\]]+")
-  urls <- unique(unlist(matches))
-  unique(sapply(urls, clean_url, USE.NAMES = FALSE))
+  urls <- unlist(matches)
+  urls <- str_remove(urls, "[.,;:!?]+$")   # strip trailing punctuation
+  urls <- sapply(urls, clean_url, USE.NAMES = FALSE)
+  unique(urls[nzchar(urls)])
 }
 
 # Wrap URLs in text with clickable <a> tags (cleans href, keeps display text clean too)
@@ -67,27 +69,28 @@ highlight_text <- function(text, keywords) {
   linkify(text)
 }
 
-# Find up to n_before/n_after sentences around a URL in the full text.
-# Matches by stripping whitespace from both sides (handles GROBID-broken URLs).
-get_url_context <- function(full_text, url, n_before = 2, n_after = 2) {
-  if (is.na(full_text) || nchar(full_text) == 0) return(NA_character_)
+# Find context windows around every occurrence of a URL in the full text.
+# Returns a character vector of unique context strings (one per occurrence).
+# Matches by stripping whitespace (handles GROBID-broken URLs in body text).
+get_url_contexts <- function(full_text, url, n_before = 2, n_after = 2) {
+  if (is.na(full_text) || nchar(full_text) == 0) return(character(0))
   sentences <- unlist(strsplit(full_text, "(?<=[.!?])\\s+", perl = TRUE))
 
-  # Use first 30 chars of domain+path as a robust partial match
   url_core <- url %>%
     str_remove("^https?://") %>%
     str_remove_all("\\s") %>%
     substr(1, 30) %>%
     str_replace_all("([.?+*()\\[\\]{}|^$\\\\])", "\\\\\\1")
 
-  # Match against sentences with spaces collapsed (handles broken URLs in text)
   idx <- which(str_detect(str_remove_all(sentences, "\\s"),
                            regex(url_core, ignore_case = TRUE)))
-  if (length(idx) == 0) return(NA_character_)
+  if (length(idx) == 0) return(character(0))
 
-  i <- idx[1]
-  paste(sentences[max(1, i - n_before):min(length(sentences), i + n_after)],
-        collapse = " ")
+  contexts <- sapply(idx, function(i) {
+    paste(sentences[max(1, i - n_before):min(length(sentences), i + n_after)],
+          collapse = " ")
+  })
+  unique(contexts)   # deduplicate identical windows
 }
 ```
 
@@ -144,11 +147,13 @@ for (i in seq_len(nrow(articles))) {
   if (length(all_urls) > 0) {
     cat("**Links Found in Paper**\n\n")
     for (url in all_urls) {
-      url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
-      ctx      <- get_url_context(article$full_text, url)
-      if (!is.na(ctx)) {
-        ctx_hl <- linkify(ctx)
-        cat(sprintf('<blockquote>%s<br><em>Link:</em> %s</blockquote>\n\n', ctx_hl, url_link))
+      url_link  <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
+      contexts  <- get_url_contexts(article$full_text, url)
+      if (length(contexts) > 0) {
+        for (ctx in contexts) {
+          ctx_hl <- linkify(ctx)
+          cat(sprintf('<blockquote>%s<br><em>Link:</em> %s</blockquote>\n\n', ctx_hl, url_link))
+        }
       } else {
         cat(sprintf('- %s\n\n', url_link))
       }

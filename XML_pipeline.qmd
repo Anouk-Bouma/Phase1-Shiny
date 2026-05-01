@@ -89,8 +89,9 @@ parse_tei_xml <- function(xml_path) {
     # Secondary source: regex over plain text (catches any URL not wrapped in
     # a ref element, e.g. in a footnote or table cell).
     all_text        <- paste(c(abstract, full_text), collapse = " ")
-    urls_text       <- unique(unlist(str_extract_all(
-      all_text, "https?://[^\\s<>\"'\\)\\]]+")))
+    urls_text       <- unlist(str_extract_all(
+      all_text, "https?://[^\\s<>\"'\\)\\]]+"))
+    urls_text       <- str_remove(urls_text, "[.,;:!?]+$")
     urls_text       <- sapply(urls_text, clean_url, USE.NAMES = FALSE)
 
     all_urls <- unique(c(urls_structured, urls_text))
