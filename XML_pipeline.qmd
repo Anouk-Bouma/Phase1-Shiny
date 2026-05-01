@@ -87,6 +87,10 @@ parse_tei_xml <- function(xml_path) {
       if (is.na(target) || !nzchar(target)) return(NULL)
       target  <- str_remove(target, "[.,;:!?]+$")
       context <- trimws(xml_text(xml_parent(ref)))
+      anchor  <- trimws(xml_text(ref))
+      if (nzchar(anchor) && anchor != target)
+        context <- str_replace(context, fixed(anchor),
+                               paste0(anchor, " [", target, "]"))
       tibble(url = target, context = context)
     })
 
