@@ -123,7 +123,7 @@ for (i in seq_len(nrow(articles))) {
 
   # ── Links found in paper ─────────────────────────────────────────────────
   if (length(all_urls) > 0) {
-    cat("**Links Found in Paper**\n\n")
+    cat("<h4>Links Found in Paper</h4>\n")
     all_urls <- all_urls[order(str_detect(all_urls, regex("doi", ignore_case = TRUE)))]
     for (url in all_urls) {
       url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
@@ -143,7 +143,7 @@ for (i in seq_len(nrow(articles))) {
 
   # ── Keyword matches (each keyword collapsed) ─────────────────────────────
   if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
-    cat("**Keyword Matches**\n\n")
+    cat("<h4>Keyword Matches</h4>\n")
     for (kw in code_keywords) {
       contexts <- keyword_df$context[keyword_df$keyword == kw]
       if (length(contexts) == 0) next
