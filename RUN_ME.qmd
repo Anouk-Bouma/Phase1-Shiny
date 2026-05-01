@@ -66,6 +66,29 @@ highlight_text <- function(text, keywords) {
   }
   linkify(text)
 }
+
+# Find up to n_before/n_after sentences around a URL in the full text.
+# Matches by stripping whitespace from both sides (handles GROBID-broken URLs).
+get_url_context <- function(full_text, url, n_before = 2, n_after = 2) {
+  if (is.na(full_text) || nchar(full_text) == 0) return(NA_character_)
+  sentences <- unlist(strsplit(full_text, "(?<=[.!?])\\s+", perl = TRUE))
+
+  # Use first 30 chars of domain+path as a robust partial match
+  url_core <- url %>%
+    str_remove("^https?://") %>%
+    str_remove_all("\\s") %>%
+    substr(1, 30) %>%
+    str_replace_all("([.?+*()\\[\\]{}|^$\\\\])", "\\\\\\1")
+
+  # Match against sentences with spaces collapsed (handles broken URLs in text)
+  idx <- which(str_detect(str_remove_all(sentences, "\\s"),
+                           regex(url_core, ignore_case = TRUE)))
+  if (length(idx) == 0) return(NA_character_)
+
+  i <- idx[1]
+  paste(sentences[max(1, i - n_before):min(length(sentences), i + n_after)],
+        collapse = " ")
+}
 ```
 
 ```{r report, results='asis'}
@@ -94,9 +117,9 @@ for (i in seq_len(nrow(articles))) {
   cat(sprintf('**Link:** <a href="%s" target="_blank">%s</a>\n\n',
               article$`DOI Link`, article$`DOI Link`))
 
-  # ── Abstract ────────────────────────────────────────────────────────────
-  cat("**Abstract**\n\n")
-  cat('<div style="margin-bottom:1em;">', bold_abstract, "</div>\n\n")
+  # ── Abstract (collapsed by default) ─────────────────────────────────────
+  cat('<details style="margin-bottom:1em;"><summary><strong>Abstract</strong></summary>\n')
+  cat('<div style="padding:0.5em 0;">', bold_abstract, "</div></details>\n\n")
 
   # ── Keyword matches ──────────────────────────────────────────────────────
   if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
@@ -121,9 +144,15 @@ for (i in seq_len(nrow(articles))) {
   if (length(all_urls) > 0) {
     cat("**Links Found in Paper**\n\n")
     for (url in all_urls) {
-      cat(sprintf('- <a href="%s" target="_blank">%s</a>\n', url, url))
+      url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
+      ctx      <- get_url_context(article$full_text, url)
+      if (!is.na(ctx)) {
+        ctx_hl <- linkify(ctx)
+        cat(sprintf('<blockquote>%s<br><em>Link:</em> %s</blockquote>\n\n', ctx_hl, url_link))
+      } else {
+        cat(sprintf('- %s\n\n', url_link))
+      }
     }
-    cat("\n")
   }
 
   cat("\n---\n")

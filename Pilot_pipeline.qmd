@@ -75,7 +75,7 @@ parse_tei_xml <- function(xml_path) {
     body_nodes <- xml_find_all(
       doc, "//tei:body//*[self::tei:p or self::tei:head][not(ancestor::tei:figure[@type='table'])][not(ancestor::tei:formula)]", ns)
     back_nodes <- xml_find_all(
-      doc, "//tei:back//tei:p[not(ancestor::tei:figure[@type='table'])][not(ancestor::tei:formula)]", ns)
+      doc, "//tei:back//*[self::tei:p or self::tei:head][not(ancestor::tei:listBibl)][not(ancestor::tei:figure[@type='table'])][not(ancestor::tei:formula)]", ns)
     full_text  <- gsub("\n", " ",
       paste(c(xml_text(body_nodes), xml_text(back_nodes)), collapse = " "))
 
