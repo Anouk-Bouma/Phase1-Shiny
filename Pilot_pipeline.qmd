@@ -89,25 +89,7 @@ parse_tei_xml <- function(xml_path) {
       tibble(url = target, context = context)
     })
 
-    urls_structured <- if (nrow(url_data) > 0) unique(url_data$url) else character(0)
-
-    # Replace each <ref type="url"> element's (potentially space-broken) text
-    # content with the clean target URL before running the regex, so broken
-    # forms don't appear as spurious separate links.
-    full_text_for_regex <- full_text
-    for (ref in url_refs) {
-      broken <- xml_text(ref)
-      tgt    <- clean_url(xml_attr(ref, "target"))
-      if (!is.na(tgt) && nzchar(tgt) && nzchar(broken))
-        full_text_for_regex <- str_replace_all(full_text_for_regex, fixed(broken), tgt)
-    }
-    urls_text <- unlist(str_extract_all(
-      paste(abstract, full_text_for_regex), "https?://[^\\s<>\"'\\)\\]]+"))
-    urls_text <- str_remove(urls_text, "[.,;:!?]+$")
-    urls_text <- sapply(urls_text, clean_url, USE.NAMES = FALSE)
-
-    all_urls <- unique(c(urls_structured, urls_text))
-    all_urls <- all_urls[nzchar(all_urls)]
+    all_urls <- if (nrow(url_data) > 0) unique(url_data$url) else character(0)
 
     # DOI from XML (fallback)
     doi_node <- xml_find_first(doc, "//tei:idno[@type='DOI']", ns)
