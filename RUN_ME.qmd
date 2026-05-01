@@ -124,6 +124,7 @@ for (i in seq_len(nrow(articles))) {
   # ── Links found in paper ─────────────────────────────────────────────────
   if (length(all_urls) > 0) {
     cat("**Links Found in Paper**\n\n")
+    all_urls <- all_urls[order(str_detect(all_urls, regex("doi", ignore_case = TRUE)))]
     for (url in all_urls) {
       url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
       contexts <- get_url_contexts(article$full_text, url)
