@@ -129,11 +129,13 @@ for (i in seq_len(nrow(articles))) {
       url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
       contexts <- get_url_contexts(article$full_text, url)
       # Bullet with clickable link
-      cat(sprintf('<p style="margin-top:1em; margin-bottom:0.2em;"><span style="font-size:1.15em;">%s</span></p>\n', url_link))
-      # Context windows below the link, with keywords bolded
-      for (ctx in contexts) {
-        ctx_hl <- highlight_text(ctx, code_keywords)
-        cat(sprintf('<blockquote style="margin-top:0.2em;">%s</blockquote>\n\n', ctx_hl))
+      cat(sprintf('<p style="margin-top:1em; margin-bottom:0.2em;"><strong style="color:black;">Link:</strong> <span style="font-size:1.15em;">%s</span></p>\n', url_link))
+      if (length(contexts) > 0) {
+        cat('<p style="margin-bottom:0.2em;"><strong style="color:black;">Contexts:</strong></p>\n')
+        for (ctx in contexts) {
+          ctx_hl <- highlight_text(ctx, code_keywords)
+          cat(sprintf('<blockquote style="margin-top:0.2em;">%s</blockquote>\n\n', ctx_hl))
+        }
       }
     }
     cat("\n")
