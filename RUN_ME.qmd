@@ -72,7 +72,7 @@ highlight_text <- function(text, keywords) {
 # Find context windows around every occurrence of a URL in the full text.
 # Returns a character vector of unique context strings (one per occurrence).
 # Matches by stripping whitespace (handles GROBID-broken URLs in body text).
-get_url_contexts <- function(full_text, url, n_before = 2, n_after = 2) {
+get_url_contexts <- function(full_text, url, n_before = 1, n_after = 1) {
   if (is.na(full_text) || nchar(full_text) == 0) return(character(0))
   sentences <- unlist(strsplit(full_text, "(?<=[.!?])\\s+", perl = TRUE))
 
