@@ -94,7 +94,16 @@ parse_tei_xml <- function(xml_path) {
 
     # Secondary source: regex over plain text (catches any URL not wrapped in
     # a ref element, e.g. in a footnote or table cell).
-    all_text  <- paste(c(abstract, full_text), collapse = " ")
+    # First, replace each <ref type="url"> element's (potentially space-broken)
+    # text content with the clean target URL so the regex sees the correct form.
+    full_text_for_regex <- full_text
+    for (ref in url_refs) {
+      broken <- xml_text(ref)
+      tgt    <- clean_url(xml_attr(ref, "target"))
+      if (!is.na(tgt) && nzchar(tgt) && nzchar(broken))
+        full_text_for_regex <- str_replace_all(full_text_for_regex, fixed(broken), tgt)
+    }
+    all_text  <- paste(c(abstract, full_text_for_regex), collapse = " ")
     urls_text <- unlist(str_extract_all(all_text, "https?://[^\\s<>\"'\\)\\]]+"))
     urls_text <- str_remove(urls_text, "[.,;:!?]+$")
     urls_text <- sapply(urls_text, clean_url, USE.NAMES = FALSE)
