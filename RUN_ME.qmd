@@ -74,16 +74,7 @@ highlight_text <- function(text, keywords) {
 # Matches by stripping whitespace (handles GROBID-broken URLs in body text).
 get_url_contexts <- function(full_text, url, n_before = 1, n_after = 1) {
   if (is.na(full_text) || nchar(full_text) == 0) return(character(0))
-
-  # Collapse spaces inside broken URLs before sentence splitting so that dots
-  # within URLs (e.g. "osf. io") are not mistaken for sentence boundaries.
-  # Matches "https://" followed by words that may be separated by spaces,
-  # stopping before punctuation that signals an actual sentence end.
-  clean_text <- str_replace_all(full_text,
-    "https?://\\S*(?:\\s+[^\\s.!?][^\\s]*)*",
-    function(m) str_remove_all(m, "\\s"))
-
-  sentences <- unlist(strsplit(clean_text, "(?<=[.!?])\\s+", perl = TRUE))
+  sentences <- unlist(strsplit(full_text, "(?<=[.!?])\\s+", perl = TRUE))
 
   url_core <- url %>%
     str_remove("^https?://") %>%
@@ -134,13 +125,21 @@ for (i in seq_len(nrow(articles))) {
   if (length(all_urls) > 0) {
     cat("<h4>Links Found in Paper</h4>\n")
     all_urls <- all_urls[order(str_detect(all_urls, regex("doi", ignore_case = TRUE)))]
+    # Pre-extracted contexts from XML (keyed by clean target URL)
+    xml_url_data <- if ("url_data" %in% names(article) && !is.null(article$url_data[[1]]))
+      article$url_data[[1]] else tibble(url = character(0), context = character(0))
     for (url in all_urls) {
       url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
-      contexts <- get_url_contexts(article$full_text, url)
-      # Bullet with clickable link
+      # Use XML-extracted context first; fall back to full-text search
+      xml_ctx  <- xml_url_data$context[xml_url_data$url == url]
+      contexts <- if (length(xml_ctx) > 0 && any(nzchar(xml_ctx))) {
+        unique(xml_ctx[nzchar(xml_ctx)])
+      } else {
+        get_url_contexts(article$full_text, url)
+      }
       cat(sprintf('<p style="margin-top:1em; margin-bottom:0.2em;"><strong style="color:black;">Link:</strong> <span style="font-size:1.15em;">%s</span></p>\n', url_link))
       if (length(contexts) > 0) {
-        #cat('<p style="margin-bottom:0.2em;color:black;">Contexts:</p>\n')
+        cat('<p style="margin-bottom:0.2em;color:black;">Contexts:</p>\n')
         for (ctx in contexts) {
           ctx_hl <- highlight_text(ctx, code_keywords)
           cat(sprintf('<blockquote style="margin-top:0.2em;">%s</blockquote>\n\n', ctx_hl))
