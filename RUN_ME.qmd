@@ -74,7 +74,16 @@ highlight_text <- function(text, keywords) {
 # Matches by stripping whitespace (handles GROBID-broken URLs in body text).
 get_url_contexts <- function(full_text, url, n_before = 1, n_after = 1) {
   if (is.na(full_text) || nchar(full_text) == 0) return(character(0))
-  sentences <- unlist(strsplit(full_text, "(?<=[.!?])\\s+", perl = TRUE))
+
+  # Collapse spaces inside broken URLs before sentence splitting so that dots
+  # within URLs (e.g. "osf. io") are not mistaken for sentence boundaries.
+  # Matches "https://" followed by words that may be separated by spaces,
+  # stopping before punctuation that signals an actual sentence end.
+  clean_text <- str_replace_all(full_text,
+    "https?://\\S*(?:\\s+[^\\s.!?][^\\s]*)*",
+    function(m) str_remove_all(m, "\\s"))
+
+  sentences <- unlist(strsplit(clean_text, "(?<=[.!?])\\s+", perl = TRUE))
 
   url_core <- url %>%
     str_remove("^https?://") %>%
@@ -90,7 +99,7 @@ get_url_contexts <- function(full_text, url, n_before = 1, n_after = 1) {
     paste(sentences[max(1, i - n_before):min(length(sentences), i + n_after)],
           collapse = " ")
   })
-  unique(contexts)   # deduplicate identical windows
+  unique(contexts)
 }
 ```
 
@@ -131,7 +140,7 @@ for (i in seq_len(nrow(articles))) {
       # Bullet with clickable link
       cat(sprintf('<p style="margin-top:1em; margin-bottom:0.2em;"><strong style="color:black;">Link:</strong> <span style="font-size:1.15em;">%s</span></p>\n', url_link))
       if (length(contexts) > 0) {
-        cat('<p style="margin-bottom:0.2em;color:black;">Contexts:</p>\n')
+        #cat('<p style="margin-bottom:0.2em;color:black;">Contexts:</p>\n')
         for (ctx in contexts) {
           ctx_hl <- highlight_text(ctx, code_keywords)
           cat(sprintf('<blockquote style="margin-top:0.2em;">%s</blockquote>\n\n', ctx_hl))
