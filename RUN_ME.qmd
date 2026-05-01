@@ -96,68 +96,65 @@ get_url_contexts <- function(full_text, url, n_before = 2, n_after = 2) {
 
 ```{r report, results='asis'}
 for (i in seq_len(nrow(articles))) {
-  article     <- articles[i, ]
-  keyword_df  <- article$keyword_data[[1]]
+  article    <- articles[i, ]
+  keyword_df <- article$keyword_data[[1]]
 
   context_texts <- if (!is.null(keyword_df) && nrow(keyword_df) > 0)
     keyword_df$context else character(0)
 
-  # Use pre-extracted URLs from XML pipeline if available (cleaner, includes
-  # hyperlinks from the PDF's link layer). Fall back to regex for PDF-sourced data.
   all_urls <- if ("urls" %in% names(article) && length(article$urls[[1]]) > 0) {
     article$urls[[1]]
   } else {
     extract_urls(c(article$abstract, context_texts))
   }
 
-  bold_abstract <- highlight_text(article$abstract, code_keywords)
-
-  # ── Article header (used as TOC entry) ──────────────────────────────────
+  # ── Article header ───────────────────────────────────────────────────────
   cat(sprintf("\n\n## %d. %s\n\n", i, article$title))
 
-  # ── Metadata ────────────────────────────────────────────────────────────
+  # ── Metadata ─────────────────────────────────────────────────────────────
   cat(sprintf('**DOI:** %s  \n', article$DOI))
   cat(sprintf('**Link:** <a href="%s" target="_blank">%s</a>\n\n',
               article$`DOI Link`, article$`DOI Link`))
 
-  # ── Abstract (collapsed by default) ─────────────────────────────────────
+  # ── Abstract (collapsed) ─────────────────────────────────────────────────
+  bold_abstract <- highlight_text(article$abstract, code_keywords)
   cat('<details style="margin-bottom:1em;"><summary><strong>Abstract</strong></summary>\n')
   cat('<div style="padding:0.5em 0;">', bold_abstract, "</div></details>\n\n")
-
-  # ── Keyword matches ──────────────────────────────────────────────────────
-  if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
-    cat("**Keyword Matches**\n\n")
-    for (kw in code_keywords) {
-      contexts <- keyword_df$context[keyword_df$keyword == kw]
-      if (length(contexts) == 0) next
-      cat(sprintf("*%s*\n\n", kw))
-      for (ctx in contexts) {
-        ctx_hl <- str_replace_all(ctx,
-          regex(paste0("\\b", kw, "\\w*"), ignore_case = TRUE),
-          function(m) paste0("<strong>", m, "</strong>"))
-        ctx_hl <- linkify(ctx_hl)
-        cat(sprintf('<blockquote>%s</blockquote>\n\n', ctx_hl))
-      }
-    }
-  } else {
-    cat("*No keyword matches found.*\n\n")
-  }
 
   # ── Links found in paper ─────────────────────────────────────────────────
   if (length(all_urls) > 0) {
     cat("**Links Found in Paper**\n\n")
     for (url in all_urls) {
-      url_link  <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
-      contexts  <- get_url_contexts(article$full_text, url)
-      if (length(contexts) > 0) {
-        for (ctx in contexts) {
-          ctx_hl <- linkify(ctx)
-          cat(sprintf('<blockquote>%s<br><em>Link:</em> %s</blockquote>\n\n', ctx_hl, url_link))
-        }
-      } else {
-        cat(sprintf('- %s\n\n', url_link))
+      url_link <- sprintf('<a href="%s" target="_blank">%s</a>', url, url)
+      contexts <- get_url_contexts(article$full_text, url)
+      # Bullet with clickable link
+      cat(sprintf('<ul style="margin-bottom:0.2em;"><li>%s</li></ul>\n', url_link))
+      # Context windows below the link, with keywords bolded
+      for (ctx in contexts) {
+        ctx_hl <- highlight_text(ctx, code_keywords)
+        cat(sprintf('<blockquote style="margin-top:0.2em;">%s</blockquote>\n\n', ctx_hl))
       }
     }
+    cat("\n")
+  }
+
+  # ── Keyword matches (each keyword collapsed) ─────────────────────────────
+  if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
+    cat("**Keyword Matches**\n\n")
+    for (kw in code_keywords) {
+      contexts <- keyword_df$context[keyword_df$keyword == kw]
+      if (length(contexts) == 0) next
+      cat(sprintf(
+        '<details style="margin-bottom:0.5em;">\n<summary><strong style="font-size:1.15em;">%s</strong></summary>\n',
+        kw))
+      for (ctx in contexts) {
+        ctx_hl <- highlight_text(ctx, code_keywords)
+        cat(sprintf('<blockquote>%s</blockquote>\n', ctx_hl))
+      }
+      cat('</details>\n\n')
+    }
+  } else {
+    cat("*No keyword matches found.*\n\n")
   }
 
   cat("\n---\n")
