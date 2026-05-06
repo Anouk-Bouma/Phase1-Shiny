@@ -169,7 +169,8 @@ key_phrases_exact <- c("code", "script", "osf", "git",
                        "restricted access", "upon reasonable request")
     
 key_phrases_gapped <- list(
-  # c("code", "shared")
+  c("available", "request"),
+  c("code", "request")
 )
 max_gap <- 3
 ```
