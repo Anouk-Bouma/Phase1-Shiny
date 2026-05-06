@@ -165,12 +165,12 @@ message(sum(!is.na(full_data$full_text)), " of ", nrow(full_data),
 ```{r}
 key_phrases_exact <- c("code", "script", "osf", "github", "gitlab",
                        "zenodo", "figshare", "supplement", "replicate",
-                       "reproduce", "appendix")
+                       "reproduce", "appendix", "syntax")
 
-key_phrases_gapped <- list(
-  c("code", "shared")
-)
-max_gap <- 3
+# key_phrases_gapped <- list(
+#   c("code", "shared")
+# )
+# max_gap <- 3
 ```
 
 ## Extract keyword context

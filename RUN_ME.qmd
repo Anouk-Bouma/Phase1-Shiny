@@ -19,7 +19,7 @@ library(stringr)
 library(purrr)
 
 # Keywords in protocol order
-code_keywords <- c("code", "script", "osf", "github", "supplement",
+code_keywords <- c("code", "script", "osf", "github", "figshare", "supplement",
                    "replicate", "reproduce", "zenodo", "appendix", "syntax")
 
 # Data file — update this path to match your batch file
@@ -64,7 +64,8 @@ highlight_text <- function(text, keywords) {
   for (kw in keywords) {
     text <- str_replace_all(text,
       regex(paste0("\\b", kw, "\\w*"), ignore_case = TRUE),
-      function(m) paste0("<strong>", m, "</strong>"))
+      function(m) paste0("<strong>", m, "</strong>")
+      )
   }
   linkify(text)
 }
