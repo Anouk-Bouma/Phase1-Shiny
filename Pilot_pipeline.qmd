@@ -163,7 +163,7 @@ message(sum(!is.na(full_data$full_text)), " of ", nrow(full_data),
 ## Keyword definitions
 
 ```{r}
-key_phrases_exact <- c("code", "script", "osf", "github", "gitlab",
+key_phrases_exact <- c("code", "script", "osf", "git",
                        "zenodo", "figshare", "supplement", "replicate",
                        "reproduce", "appendix", "syntax")
 
