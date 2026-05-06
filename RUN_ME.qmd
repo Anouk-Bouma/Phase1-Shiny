@@ -58,6 +58,15 @@ linkify <- function(text) {
     })
 }
 
+# Bold keywords in already-linkified text, skipping content inside <a> tags
+bold_keywords <- function(text, keywords) {
+  for (kw in keywords) {
+    text <- str_replace_all(text,
+      regex(paste0("(<a\\s[^>]*>.*?</a>)|(\\b", kw, "\\w*)"), ignore_case = TRUE),
+      function(m) if (startsWith(m, "<a ")) m else paste0("<strong>", m, "</strong>"))
+  }
+  text
+}
 
 # Find context windows around every occurrence of a URL in the full text.
 # Returns a character vector of unique context strings (one per occurrence).
@@ -149,7 +158,7 @@ for (i in seq_len(nrow(articles))) {
         '<details style="margin-bottom:0.5em;">\n<summary><strong style="font-size:1.15em;">%s</strong></summary>\n',
         kw))
       for (ctx in contexts) {
-        ctx_hl <- linkify(ctx)
+        ctx_hl <- bold_keywords(linkify(ctx), code_keywords)
         cat(sprintf('<blockquote>%s</blockquote>\n', ctx_hl))
       }
       cat('</details>\n\n')
