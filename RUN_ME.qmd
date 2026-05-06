@@ -25,6 +25,14 @@ code_keywords <- c("code", "script", "osf", "github", "figshare", "supplement",
 # Data file — update this path to match your batch file
 data_file <- "pilot-data.rds"
 
+# PDF lookup: scan PilotItems/files/ for PDFs and map doi_no_slash -> relative path
+pdf_files <- list.files("PilotItems/files", pattern = "\\.pdf$",
+                        recursive = TRUE, full.names = FALSE)
+pdf_lookup <- setNames(
+  file.path("PilotItems/files", pdf_files),
+  tools::file_path_sans_ext(basename(pdf_files))
+)
+
 if (file.exists(data_file)) {
   articles <- readRDS(data_file)
 } else {
@@ -112,8 +120,12 @@ for (i in seq_len(nrow(articles))) {
 
   # ── Metadata ─────────────────────────────────────────────────────────────
   cat(sprintf('**DOI:** %s  \n', article$DOI))
-  cat(sprintf('**Link:** <a href="%s" target="_blank">%s</a>\n\n',
+  cat(sprintf('**Link:** <a href="%s" target="_blank">%s</a>  \n',
               article$`DOI Link`, article$`DOI Link`))
+  pdf_path <- pdf_lookup[article$doi_no_slash]
+  if (!is.na(pdf_path))
+    cat(sprintf('**PDF:** <a href="%s" target="_blank">Open PDF</a>\n\n', pdf_path)) else
+    cat("\n")
 
   # ── Abstract (collapsed) ─────────────────────────────────────────────────
   bold_abstract <- linkify(article$abstract)
