@@ -165,8 +165,9 @@ message(sum(!is.na(full_data$full_text)), " of ", nrow(full_data),
 ```{r}
 key_phrases_exact <- c("code", "script", "osf", "git",
                        "zenodo", "figshare", "supplement", "replicate",
-                       "reproduce", "appendix", "syntax")
-
+                       "reproduce", "appendix", "syntax", "upon request",
+                       "restricted access", "upon reasonable request")
+    
 key_phrases_gapped <- list(
   # c("code", "shared")
 )
