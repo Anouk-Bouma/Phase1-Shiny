@@ -63,7 +63,7 @@ bold_keywords <- function(text, keywords) {
   for (kw in keywords) {
     text <- str_replace_all(text,
       regex(paste0("(<a\\s[^>]*>.*?</a>)|(\\b", kw, "\\w*)"), ignore_case = TRUE),
-      function(m) if (startsWith(m, "<a ")) m else paste0("<strong>", m, "</strong>"))
+      function(m) ifelse(startsWith(m, "<a "), m, paste0("<strong>", m, "</strong>")))
   }
   text
 }
