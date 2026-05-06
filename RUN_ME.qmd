@@ -58,16 +58,6 @@ linkify <- function(text) {
     })
 }
 
-# Bold code keywords and linkify URLs in a block of text
-highlight_text <- function(text, keywords) {
-  if (is.na(text) || nchar(text) == 0) return(text)
-  for (kw in keywords) {
-    text <- str_replace_all(text,
-      regex(paste0("\\b", kw, "\\w*"), ignore_case = TRUE),
-      function(m) paste0("<strong>", m, "</strong>"))
-  }
-  linkify(text)
-}
 
 # Find context windows around every occurrence of a URL in the full text.
 # Returns a character vector of unique context strings (one per occurrence).
@@ -117,7 +107,7 @@ for (i in seq_len(nrow(articles))) {
               article$`DOI Link`, article$`DOI Link`))
 
   # ── Abstract (collapsed) ─────────────────────────────────────────────────
-  bold_abstract <- highlight_text(article$abstract, code_keywords)
+  bold_abstract <- linkify(article$abstract)
   cat('<details style="margin-bottom:1em;"><summary><strong>Abstract</strong></summary>\n')
   cat('<div style="padding:0.5em 0;">', bold_abstract, "</div></details>\n\n")
 
@@ -141,7 +131,7 @@ for (i in seq_len(nrow(articles))) {
       if (length(contexts) > 0) {
         cat('<p style="margin-bottom:0.2em;color:black;">Contexts:</p>\n')
         for (ctx in contexts) {
-          ctx_hl <- highlight_text(ctx, code_keywords)
+          ctx_hl <- linkify(ctx)
           cat(sprintf('<blockquote style="margin-top:0.2em;">%s</blockquote>\n\n', ctx_hl))
         }
       }
@@ -159,7 +149,7 @@ for (i in seq_len(nrow(articles))) {
         '<details style="margin-bottom:0.5em;">\n<summary><strong style="font-size:1.15em;">%s</strong></summary>\n',
         kw))
       for (ctx in contexts) {
-        ctx_hl <- highlight_text(ctx, code_keywords)
+        ctx_hl <- linkify(ctx)
         cat(sprintf('<blockquote>%s</blockquote>\n', ctx_hl))
       }
       cat('</details>\n\n')
