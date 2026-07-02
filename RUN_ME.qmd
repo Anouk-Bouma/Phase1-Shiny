@@ -18,10 +18,12 @@ library(dplyr)
 library(stringr)
 library(purrr)
 
-# Keywords in protocol order
+# Keywords in protocol order (includes gapped keyword labels from Pilot_pipeline.qmd's
+# key_phrases_gapped, e.g. "available request" for c("available", "request"))
 code_keywords <- c("code", "script", "osf", "git", "figshare", "supplement",
-                   "replicate", "reproduce", "zenodo", "appendix", "syntax", 
-                   "upon request", "restricted access", "upon reasonable request")
+                   "replicate", "reproduce", "zenodo", "appendix", "syntax",
+                   "upon request", "restricted access", "upon reasonable request",
+                   "available request", "code request")
 
 # Data file — update this path to match your batch file
 data_file <- "pilot-data.rds"
