@@ -18,12 +18,14 @@ library(dplyr)
 library(stringr)
 library(purrr)
 
-# Keywords in protocol order (includes gapped keyword labels from Pilot_pipeline.qmd's
-# key_phrases_gapped, e.g. "available request" for c("available", "request"))
+# Keywords in protocol order. Gapped-pair labels from Pilot_pipeline.qmd's
+# key_phrases_gapped (e.g. "available request") are NOT listed here — the report
+# loop below appends whatever keyword labels actually show up in each article's
+# keyword_data, so gapped pairs display automatically without needing to be
+# kept in sync with this list.
 code_keywords <- c("code", "script", "osf", "git", "figshare", "supplement",
                    "replicate", "reproduce", "zenodo", "appendix", "syntax",
-                   "upon request", "restricted access", "upon reasonable request",
-                   "available request", "code request")
+                   "upon request", "restricted access", "upon reasonable request")
 
 # Data file — update this path to match your batch file
 data_file <- "pilot-data.rds"
@@ -166,14 +168,20 @@ for (i in seq_len(nrow(articles))) {
   # ── Keyword matches (each keyword collapsed) ─────────────────────────────
   if (!is.null(keyword_df) && nrow(keyword_df) > 0) {
     cat("<h4>Keyword Matches</h4>\n")
-    for (kw in code_keywords) {
+    # Protocol keywords first (in order), then any other labels found in the
+    # data (e.g. gapped-pair matches like "available request") appended after.
+    display_keywords <- unique(c(code_keywords, keyword_df$keyword))
+    for (kw in display_keywords) {
       contexts <- keyword_df$context[keyword_df$keyword == kw]
       if (length(contexts) == 0) next
       cat(sprintf(
         '<details style="margin-bottom:0.5em;">\n<summary><strong style="font-size:1.15em;">%s</strong></summary>\n',
         kw))
       for (ctx in contexts) {
-        ctx_hl <- bold_keywords(linkify(ctx), code_keywords)
+        # Bold the individual words of a gapped-pair label too (e.g. "available"
+        # and "request"), since they rarely appear as one contiguous phrase.
+        bold_words <- unique(c(code_keywords, strsplit(kw, "\\s+")[[1]]))
+        ctx_hl <- bold_keywords(linkify(ctx), bold_words)
         cat(sprintf('<blockquote>%s</blockquote>\n', ctx_hl))
       }
       cat('</details>\n\n')
