@@ -59,7 +59,9 @@ included_dois <- readRDS("all_articles.rds") %>%
 
 # Filter the meta_data df to contain only those items that are in the list of included doi's
 meta_data <- meta_data %>%
-  filter(doi_no_slash %in% included_dois)
+  filter(doi_no_slash %in% included_dois) %>%
+  # Add ID variable to the data frame
+  mutate(ID = sprintf("P%03d", row_number()))
 ```
 
 ## Parse TEI XML files

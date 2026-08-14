@@ -1,0 +1,44 @@
+---
+title: "Pdf_to_XML"
+format: html
+editor: visual
+---
+
+## Dependency Management
+
+```{r}
+
+renv::restore()
+
+library(metacheck)
+```
+
+## Install and load Metacheck
+
+```{r}
+
+# install.packages("devtools")
+#pak::pak("scienceverse/metacheck")
+
+```
+
+## Process batch to XML files
+
+```{r}
+
+#Listing all the filepaths at which the pdf's are stored
+pdf_files <- list.files(
+  path = "Articles_testbatch",
+  pattern = "\\.pdf$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
+
+paper_testbatch <- convert(file_path = pdf_files,
+                           save_path = "Articles_testbatch",
+                           method = "grobid",
+                           api_url = "https://grobidOrg-grobid.hf.space", #if the server is not active take another one from list of active servers: https://www.scienceverse.org/metacheck/convert.json
+                           crossref_lookup = FALSE)
+
+```
