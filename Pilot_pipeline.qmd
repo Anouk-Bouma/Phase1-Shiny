@@ -6,6 +6,8 @@ editor: visual
 
 ## Packages
 
+<!--# RENV?? -->
+
 ```{r}
 #| echo: false
 library(xml2)
@@ -16,6 +18,8 @@ library(bib2df)
 ```
 
 ## Configuration
+
+Just three settings, so you can point the script at different input/output files without touching the logic below.
 
 ```{r}
 # BibTeX metadata file exported from Zotero
@@ -29,6 +33,8 @@ output_file <- "pilot-data.rds"
 ```
 
 ## Read metadata from BibTeX
+
+Loads `PilotItems.bib` with `bib2df`, then keeps just `title`, `abstract`, `DOI`. Strips stray `{}` from titles. **Drops any entry without a DOI** (`filter(!is.na(DOI) & nzchar(DOI))`). Also builds `doi_no_slash` (DOI with `/` removed), which is the join key used everywhere else in the script.
 
 ```{r}
 #| echo: false
@@ -45,9 +51,30 @@ meta_data <- bib_raw %>%
   mutate(doi_no_slash = gsub("/", "", DOI))
 
 message("Extracted ", nrow(meta_data), " items with a DOI from BibTeX")
+
+# Reading in inclusion data to create a vector of the included doi's
+included_dois <- readRDS("all_articles.rds") %>%
+  filter(included == TRUE) %>%
+  pull(doi_no_slash)
+
+# Filter the meta_data df to contain only those items that are in the list of included doi's
+meta_data <- meta_data %>%
+  filter(doi_no_slash %in% included_dois)
 ```
 
 ## Parse TEI XML files
+
+-   **Title / abstract**: pulled from the XML as a fallback in case BibTeX is missing them.
+
+-   **Full text**: grabs all `<p>` and `<head>` elements from the body and back matter (e.g. data-availability statements), skipping tables and formulas. Crucially, wherever GROBID found a hyperlink (`<ref type="url">`), it appends `[the-actual-url]` right after the visible anchor text — so a link that displays as "see our repository" becomes "see our repository \[https://osf.io/...\]" in the plain-text version. That's what lets later keyword-context snippets show clickable links even though they're just strings by that point.
+
+-   **URLs**: separately extracted into a `url_data` table of `{url, context}` pairs, using the parent paragraph as context — this is the primary/cleaner source of links (vs. text-mining full_text for `https://` later).
+
+-   **DOI**: also read from the XML as a fallback join key.
+
+-   Wrapped in `tryCatch` — if a file fails to parse, it logs a warning and returns an all-NA row instead of crashing the whole loop.
+
+Each file's result becomes one row of `df_fulltext`. The `doi_no_slash` for that row is taken from the DOI found in the XML if present; otherwise it's derived from the filename (GROBID names files `<original>.pdf.tei.xml`, so it strips that suffix).
 
 ```{r}
 #| echo: false
@@ -161,6 +188,8 @@ message("Parsed ", nrow(df_fulltext), " XML files")
 
 ## Join metadata with full text
 
+Left-joins the BibTeX metadata (`meta_data`) with the XML-parsed data (`df_fulltext`) on `doi_no_slash`. Title/abstract: BibTeX wins, XML fills gaps (`coalesce`). Builds a clickable `DOI Link` column. Logs how many of the BibTeX articles actually found a matching XML file — worth checking that number isn't unexpectedly low.
+
 ```{r}
 full_data <- meta_data %>%
   left_join(df_fulltext, by = "doi_no_slash") %>%
@@ -182,17 +211,22 @@ message(sum(!is.na(full_data$full_text)), " of ", nrow(full_data),
 key_phrases_exact <- c("code", "script", "osf", "git",
                        "zenodo", "figshare", "supplement", "replicate",
                        "reproduce", "appendix", "syntax", "upon request",
-                       "restricted access", "upon reasonable request")
+                       "restricted access", "upon reasonable request", "data availability",
+                       "supporting materials", "materials", "repository")
     
 key_phrases_gapped <- list(
   c("available", "request"),
   c("code", "request"),
-  c("supplementary", "available")
+  c("upon", "request"),
+  c("supplement", "request"),
+  c("availability", "statement")
 )
 max_gap <- 3
 ```
 
 ## Extract keyword context
+
+Splits each article's full text into sentences, then for every keyword/pair, finds matching sentences and grabs a 3-sentence window (previous + matched + next) as context. Runs this over every article's `full_text` via `map()`, storing the result as a nested tibble in a new `keyword_data` list-column. Also bolts on four empty screening columns every article needs downstream: `included`, `excluded`, `second_reviewer` (all `FALSE`), `note` (`""`) — these are what you'll fill in by hand while reviewing in `RUN_ME.qmd`'s output.
 
 ```{r}
 extract_keyword_context <- function(text, key_phrases_exact, key_phrases_gapped, max_gap) {
@@ -248,6 +282,8 @@ message("Keyword extraction complete")
 ```
 
 ## Save pilot data
+
+Writes the whole thing to `pilot-data.rds`. That file is then read straight in by `RUN_ME.qmd` to generate the report.
 
 ```{r}
 saveRDS(full_data, file = output_file)
